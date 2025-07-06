@@ -1,0 +1,52 @@
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
+def scrape_time_covers(decade_url, decade_start):
+    res = requests.get(decade_url)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    
+    tables = soup.find_all('table', {'class': 'wikitable'})
+    all_data = []
+
+    for table in tables:
+        rows = table.find_all('tr')[1:]
+        for row in rows:
+            cols = row.find_all(['td', 'th'])
+            if len(cols) >= 2:
+                date_raw = cols[0].get_text(strip=True)
+                subject = cols[1].get_text(strip=True).replace('\n', ' ')
+                
+                try:
+                    year = int(date_raw[-4:])
+                except:
+                    continue
+
+                if decade_start <= year < decade_start + 10:
+                    all_data.append({
+                        'Year': year,
+                        'Date': date_raw,
+                        'Subject': subject
+                    })
+
+    return pd.DataFrame(all_data)
+
+# URLs to Wikipedia cover lists
+urls = {
+    '2000s': ('https://en.wikipedia.org/wiki/List_of_covers_of_Time_magazine_(2000s)', 2000),
+    '2010s': ('https://en.wikipedia.org/wiki/List_of_covers_of_Time_magazine_(2010s)', 2010),
+    '2020s': ('https://en.wikipedia.org/wiki/List_of_covers_of_Time_magazine_(2020s)', 2020)
+}
+
+# Scrape and combine all decades
+dfs = []
+for decade, (url, start_year) in urls.items():
+    df = scrape_time_covers(url, start_year)
+    dfs.append(df)
+
+full_df = pd.concat(dfs).reset_index(drop=True)
+
+# Save to CSV
+full_df.to_csv("time_magazine_covers_2000_2024.csv", index=False)
+
+print("✅ Saved as time_magazine_covers_2000_2024.csv")
